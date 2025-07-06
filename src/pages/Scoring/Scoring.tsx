@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import { ToggleButtonGroup, ToggleButton, Box, Typography, Paper } from '@mui/material';
 import cricketBackground from '../../assets/cricket-bk.jpg';
 import './Scoring.css';
 
@@ -23,7 +24,7 @@ const Scoring: React.FC = () => {
     const [batsman1, setBatsman1] = useState<string>('');
     const [batsman2, setBatsman2] = useState<string>('');
     const [bowler, setBowler] = useState<string>('');
-    const [currentStep, setCurrentStep] = useState<'batsman-entry' | 'scoring'>('batsman-entry');
+    const [currentStep, setCurrentStep] = useState<'batsman-entry' | 'scoring' | 'new-bowler' | 'dismissal-type' | 'new-batsman'>('batsman-entry');
     const [editingPlayer, setEditingPlayer] = useState<'batsman1' | 'batsman2' | 'bowler' | null>(null);
     const [editValue, setEditValue] = useState<string>('');
     const [currentBall, setCurrentBall] = useState<string>('');
@@ -36,6 +37,12 @@ const Scoring: React.FC = () => {
     const [batsman1Stats, setBatsman1Stats] = useState<PlayerStats>({ runs: 0, balls: 0 });
     const [batsman2Stats, setBatsman2Stats] = useState<PlayerStats>({ runs: 0, balls: 0 });
     const [bowlerStats, setBowlerStats] = useState<PlayerStats>({ runs: 0, balls: 0 });
+    const [newBowler, setNewBowler] = useState<string>('');
+    const [showNewBowlerInput, setShowNewBowlerInput] = useState<boolean>(false);
+    const [dismissalType, setDismissalType] = useState<string>('');
+    const [selectedDismissal, setSelectedDismissal] = useState<string>('');
+    const [newBatsman, setNewBatsman] = useState<string>('');
+    const [dismissedBatsman, setDismissedBatsman] = useState<'batsman1' | 'batsman2'>('batsman1');
 
     // If no match data is available, redirect to create match
     if (!matchData) {
@@ -146,6 +153,31 @@ const Scoring: React.FC = () => {
         }));
     };
 
+    const handleNewBowlerChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setNewBowler(event.target.value);
+    };
+
+    const handleNewBowlerSubmit = () => {
+        if (!newBowler.trim()) {
+            alert('Please enter the new bowler name');
+            return;
+        }
+        setBowler(newBowler);
+        setBowlerStats({ runs: 0, balls: 0 }); // Reset bowler stats for new bowler
+        setNewBowler('');
+        setShowNewBowlerInput(false);
+        setCurrentStep('scoring');
+    };
+
+    const handleOverComplete = () => {
+        // Change striker after over completion
+        setStriker(prev => prev === 'batsman1' ? 'batsman2' : 'batsman1');
+        
+        // Ask for new bowler
+        setShowNewBowlerInput(true);
+        setCurrentStep('new-bowler');
+    };
+
     const handleScoringButton = (score: string) => {
         setCurrentBall(score);
         setBallHistory(prev => [...prev, score]);
@@ -162,13 +194,21 @@ const Scoring: React.FC = () => {
                 updateBatsmanStats(striker, runValue, 1); // Add runs and 1 ball faced
                 updateBowlerStats(runValue, 1); // Add runs conceded and 1 ball bowled
                 
+                // Change striker if 1 or 3 runs are scored
+                if (runValue === 1 || runValue === 3) {
+                    setStriker(prev => prev === 'batsman1' ? 'batsman2' : 'batsman1');
+                }
+                
                 // Update balls and overs
                 setBalls(prev => {
-                    if (prev === 5) {
+                    const newBalls = prev + 1;
+                    if (newBalls === 6) {
+                        // Over completed
                         setOvers(prevOvers => prevOvers + 1);
+                        setTimeout(() => handleOverComplete(), 100); // Small delay to show the last ball
                         return 0;
                     }
-                    return prev + 1;
+                    return newBalls;
                 });
             }
         }
@@ -177,23 +217,80 @@ const Scoring: React.FC = () => {
     };
 
     const handleOut = () => {
-        setCurrentBall('W');
-        setBallHistory(prev => [...prev, 'W']);
+        setCurrentStep('dismissal-type');
+    };
+
+    const handleDismissalType = (type: string) => {
+        setDismissalType(type);
+        
+        // Record the wicket with dismissal type
+        const wicketRecord = `W (${type})`;
+        setCurrentBall(wicketRecord);
+        setBallHistory(prev => [...prev, wicketRecord]);
         setWickets(prev => prev + 1);
+        
+        // Store which batsman was dismissed
+        setDismissedBatsman(striker);
         
         // Add 1 ball to striker and bowler
         updateBatsmanStats(striker, 0, 1);
         updateBowlerStats(0, 1);
         
         setBalls(prev => {
-            if (prev === 5) {
+            const newBalls = prev + 1;
+            if (newBalls === 6) {
+                // Over completed
                 setOvers(prevOvers => prevOvers + 1);
+                setTimeout(() => handleOverComplete(), 100); // Small delay to show the last ball
                 return 0;
             }
-            return prev + 1;
+            return newBalls;
         });
         
-        console.log('Wicket!');
+        // Go to new batsman entry
+        setCurrentStep('new-batsman');
+        setSelectedDismissal(''); // Reset selection
+        
+        console.log(`Wicket! Dismissal type: ${type}`);
+    };
+
+    const handleDismissalSelection = (event: React.MouseEvent<HTMLElement>, newSelection: string) => {
+        if (newSelection !== null) {
+            setSelectedDismissal(newSelection);
+        }
+    };
+
+    const handleConfirmDismissal = () => {
+        if (selectedDismissal) {
+            handleDismissalType(selectedDismissal);
+        }
+    };
+
+    const handleNewBatsmanChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setNewBatsman(event.target.value);
+    };
+
+    const handleNewBatsmanSubmit = () => {
+        if (!newBatsman.trim()) {
+            alert('Please enter the new batsman name');
+            return;
+        }
+        
+        // Replace the dismissed batsman with the new batsman
+        if (dismissedBatsman === 'batsman1') {
+            setBatsman1(newBatsman);
+            setBatsman1Stats({ runs: 0, balls: 0 }); // Reset stats for new batsman
+            setStriker('batsman1'); // Make the new batsman the striker
+        } else {
+            setBatsman2(newBatsman);
+            setBatsman2Stats({ runs: 0, balls: 0 }); // Reset stats for new batsman
+            setStriker('batsman2'); // Make the new batsman the striker
+        }
+        
+        setNewBatsman('');
+        setCurrentStep('scoring');
+        
+        console.log(`New batsman: ${newBatsman} replaces ${dismissedBatsman}`);
     };
 
     const formatOvers = () => {
@@ -211,6 +308,10 @@ const Scoring: React.FC = () => {
         } else if (playerType === 'bowler') {
             stats = bowlerStats;
         }
+        
+        // Check if this is the current striker (only for batsmen)
+        const isCurrentStriker = (playerType === 'batsman1' && striker === 'batsman1') || 
+                                (playerType === 'batsman2' && striker === 'batsman2');
         
         return (
             <div className="player-item">
@@ -234,6 +335,7 @@ const Scoring: React.FC = () => {
                             title="Click to edit"
                         >
                             <strong>{value}</strong>
+                            {isCurrentStriker && <span className="striker-indicator">*</span>}
                         </span>
                         {stats && (
                             <div className="player-stats">
@@ -309,6 +411,256 @@ const Scoring: React.FC = () => {
                                 Next
                             </button>
                         </div>
+                    </div>
+                ) : currentStep === 'new-bowler' ? (
+                    <div className="new-bowler-section">
+                        <h3>Over Complete!</h3>
+                        <p>Current Over: {overs}.0</p>
+                        <p>Striker has changed to: {striker === 'batsman1' ? batsman1 : batsman2}</p>
+                        <div className="new-bowler-form">
+                            <label className="form-label">
+                                New Bowler: &nbsp;
+                                <input 
+                                    type="text" 
+                                    placeholder="Enter new bowler name" 
+                                    className="form-input"
+                                    value={newBowler}
+                                    onChange={handleNewBowlerChange}
+                                />
+                            </label>
+                            <button className="next-button" onClick={handleNewBowlerSubmit}>
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+                ) : currentStep === 'dismissal-type' ? (
+                    <div className="dismissal-type-section">
+                        <Paper elevation={3} sx={{ padding: 3, maxWidth: 600, margin: '0 auto' }}>
+                            <Typography variant="h4" component="h3" gutterBottom align="center" color="primary">
+                                How was the batsman dismissed?
+                            </Typography>
+                            <Typography variant="h6" component="p" gutterBottom align="center" color="text.secondary">
+                                Batsman: <strong>{striker === 'batsman1' ? batsman1 : batsman2}</strong>
+                            </Typography>
+                            
+                            <Box sx={{ mt: 3, mb: 3 }}>
+                                <ToggleButtonGroup
+                                    value={selectedDismissal}
+                                    exclusive
+                                    onChange={handleDismissalSelection}
+                                    aria-label="dismissal type"
+                                    sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                                        gap: 1,
+                                        width: '100%'
+                                    }}
+                                >
+                                    <ToggleButton 
+                                        value="Bowled" 
+                                        aria-label="bowled"
+                                        sx={{
+                                            py: 2,
+                                            px: 2,
+                                            fontWeight: 'bold',
+                                            '&.Mui-selected': {
+                                                backgroundColor: '#ff6b6b',
+                                                color: 'white',
+                                                '&:hover': {
+                                                    backgroundColor: '#ff5252'
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        Bowled
+                                    </ToggleButton>
+                                    <ToggleButton 
+                                        value="Caught" 
+                                        aria-label="caught"
+                                        sx={{
+                                            py: 2,
+                                            px: 2,
+                                            fontWeight: 'bold',
+                                            '&.Mui-selected': {
+                                                backgroundColor: '#4ecdc4',
+                                                color: 'white',
+                                                '&:hover': {
+                                                    backgroundColor: '#26a69a'
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        Caught
+                                    </ToggleButton>
+                                    <ToggleButton 
+                                        value="LBW" 
+                                        aria-label="lbw"
+                                        sx={{
+                                            py: 2,
+                                            px: 2,
+                                            fontWeight: 'bold',
+                                            '&.Mui-selected': {
+                                                backgroundColor: '#45b7d1',
+                                                color: 'white',
+                                                '&:hover': {
+                                                    backgroundColor: '#1976d2'
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        LBW
+                                    </ToggleButton>
+                                    <ToggleButton 
+                                        value="Run Out" 
+                                        aria-label="run out"
+                                        sx={{
+                                            py: 2,
+                                            px: 2,
+                                            fontWeight: 'bold',
+                                            '&.Mui-selected': {
+                                                backgroundColor: '#96ceb4',
+                                                color: 'white',
+                                                '&:hover': {
+                                                    backgroundColor: '#66bb6a'
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        Run Out
+                                    </ToggleButton>
+                                    <ToggleButton 
+                                        value="Stumped" 
+                                        aria-label="stumped"
+                                        sx={{
+                                            py: 2,
+                                            px: 2,
+                                            fontWeight: 'bold',
+                                            '&.Mui-selected': {
+                                                backgroundColor: '#feca57',
+                                                color: 'white',
+                                                '&:hover': {
+                                                    backgroundColor: '#ffa000'
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        Stumped
+                                    </ToggleButton>
+                                    <ToggleButton 
+                                        value="Retired Out" 
+                                        aria-label="retired out"
+                                        sx={{
+                                            py: 2,
+                                            px: 2,
+                                            fontWeight: 'bold',
+                                            '&.Mui-selected': {
+                                                backgroundColor: '#ff9ff3',
+                                                color: 'white',
+                                                '&:hover': {
+                                                    backgroundColor: '#e91e63'
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        Retired Out
+                                    </ToggleButton>
+                                    <ToggleButton 
+                                        value="Other" 
+                                        aria-label="other"
+                                        sx={{
+                                            py: 2,
+                                            px: 2,
+                                            fontWeight: 'bold',
+                                            '&.Mui-selected': {
+                                                backgroundColor: '#54a0ff',
+                                                color: 'white',
+                                                '&:hover': {
+                                                    backgroundColor: '#2196f3'
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        Other
+                                    </ToggleButton>
+                                </ToggleButtonGroup>
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                                <button 
+                                    className="confirm-button" 
+                                    onClick={handleConfirmDismissal}
+                                    disabled={!selectedDismissal}
+                                    style={{
+                                        padding: '12px 24px',
+                                        fontSize: '16px',
+                                        fontWeight: 'bold',
+                                        backgroundColor: selectedDismissal ? '#4caf50' : '#ccc',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        cursor: selectedDismissal ? 'pointer' : 'not-allowed',
+                                        transition: 'all 0.3s ease'
+                                    }}
+                                >
+                                    Confirm Dismissal
+                                </button>
+                            </Box>
+                        </Paper>
+                    </div>
+                ) : currentStep === 'new-batsman' ? (
+                    <div className="new-batsman-section">
+                        <Paper elevation={3} sx={{ padding: 3, maxWidth: 500, margin: '0 auto' }}>
+                            <Typography variant="h4" component="h3" gutterBottom align="center" color="primary">
+                                New Batsman Required
+                            </Typography>
+                            <Typography variant="h6" component="p" gutterBottom align="center" color="text.secondary">
+                                <strong>{dismissedBatsman === 'batsman1' ? batsman1 : batsman2}</strong> was dismissed
+                            </Typography>
+                            <Typography variant="body1" component="p" gutterBottom align="center" color="text.secondary">
+                                Dismissal: <strong>{dismissalType}</strong>
+                            </Typography>
+                            
+                            <Box sx={{ mt: 3 }}>
+                                <label className="form-label">
+                                    New Batsman: &nbsp;
+                                    <input 
+                                        type="text" 
+                                        placeholder="Enter new batsman name" 
+                                        className="form-input"
+                                        value={newBatsman}
+                                        onChange={handleNewBatsmanChange}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px',
+                                            fontSize: '16px',
+                                            border: '2px solid #ddd',
+                                            borderRadius: '8px',
+                                            marginTop: '8px'
+                                        }}
+                                    />
+                                </label>
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                                <button 
+                                    className="next-button" 
+                                    onClick={handleNewBatsmanSubmit}
+                                    style={{
+                                        padding: '12px 24px',
+                                        fontSize: '16px',
+                                        fontWeight: 'bold',
+                                        backgroundColor: '#4caf50',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.3s ease'
+                                    }}
+                                >
+                                    Continue
+                                </button>
+                            </Box>
+                        </Paper>
                     </div>
                 ) : (
                     <div className="scoring-section">
