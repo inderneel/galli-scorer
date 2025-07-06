@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import './CreateMatch.css';
-import cricketBackground from '../assets/cricket-bk.jpg';
+import cricketBackground from '../../assets/cricket-bk.jpg';
 import { ToggleButtonGroup, ToggleButton } from '@mui/material';
 
 const CreateMatch: React.FC = () => {
+    const navigate = useNavigate();
     const [tossWinner, setTossWinner] = useState<string>('');
     const [gameMode, setGameMode] = useState('batting');
     const [matchName, setMatchName] = useState<string>('');
@@ -30,8 +31,6 @@ const CreateMatch: React.FC = () => {
         }
     };
 
-    const tossWinnerName = tossWinner === 'team1' ? team1Name || 'Team 1' : team2Name || 'Team 2';
-
     const handleMatchNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setMatchName(event.target.value);
     };
@@ -43,6 +42,31 @@ const CreateMatch: React.FC = () => {
     const handleTeam2Change = (event: React.ChangeEvent<HTMLInputElement>) => {
         setTeam2Name(event.target.value);
     };
+
+    const handleStartScoring = () => {
+        if(!matchName.trim()) {
+            setMatchName(new Date().toLocaleDateString() + ' ' + team1Name + ' vs ' + team2Name);
+        }
+        // Validate that all required fields are filled
+        if (!team1Name.trim() || !team2Name.trim() || !tossWinner) {
+            alert('Please fill in all required fields: Match Name, Team 1, Team 2, and Toss Winner');
+            return;
+        }
+
+        // Navigate to scoring page with match data
+        navigate('/scoring', {
+            state: {
+                matchName,
+                team1Name,
+                team2Name,
+                tossWinner,
+                gameMode,
+                numberOfOvers
+            }
+        });
+    };
+
+    const tossWinnerName = tossWinner === 'team1' ? team1Name || 'Team 1' : team2Name || 'Team 2';
 
     return (
         <div 
@@ -121,6 +145,9 @@ const CreateMatch: React.FC = () => {
                     <ToggleButton value="bowling">Bowling</ToggleButton>
                     </ToggleButtonGroup></div>
                 </div>
+                <button className="start-scoring-button" onClick={handleStartScoring}>
+                    Start Scoring
+                </button>
             </div>
         </div>
     );

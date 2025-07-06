@@ -2,7 +2,8 @@ import { Link, Routes, Route } from 'react-router-dom'
 import React from 'react';
 import logo from './logo.svg';
 import './App.css';
-import CreateMatch from './pages/CreateMatch';
+import CreateMatch from './pages/CreateMatch/CreateMatch';
+import Scoring from './pages/Scoring/Scoring';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           </header>
         } />
         <Route path="/create-match" element={<CreateMatch />} />
+        <Route path="/scoring" element={<Scoring />} />
       </Routes>
     </div>
   );
